@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:android_tv_app/config/routes/route.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
@@ -39,6 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       print(videoUrls);
     }
+
     final filePaths = await downloadVideos(videoUrls);
     Navigator.push(
       context,
@@ -50,6 +52,9 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+    setState(() {
+      downloadedVideos = 0;
+    });
   }
 
   // Future<void> _downloadAndPlayVideos(BuildContext context) async {
@@ -185,7 +190,8 @@ class _FullscreenVideoPlayerState extends State<FullscreenVideoPlayer> {
           print(videoUrls);
           print(videoUrls2);
           _controller.dispose();
-          _chewieController?.dispose();
+          // _chewieController?.dispose();
+          cancelTimer();
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => HomeScreen()),
@@ -200,86 +206,145 @@ class _FullscreenVideoPlayerState extends State<FullscreenVideoPlayer> {
     }
   }
 
+  Timer? _timer;
 // Now, create a function to start the timer
   void startTimer() {
     const duration = Duration(seconds: 5); // 5 seconds interval
-    Timer.periodic(duration, (Timer t) => cek());
+    _timer = Timer.periodic(duration, (Timer t) => cek());
   }
+
+  void cancelTimer() {
+    _timer?.cancel();
+  }
+
+  int currentIndex = 0;
 
   @override
   void initState() {
     super.initState();
+    // Define your list of video paths here
+
+    // Initialize the first video
     _currentIndex = widget.initialIndex;
-    _initializePlayer();
+    _initializeVideoPlayer(widget.videoPaths[_currentIndex]);
     startTimer();
   }
 
-  Future<void> _initializePlayer() async {
-    if (_chewieController != null) {
-      _chewieController!.dispose();
-    }
-
-    _controller =
-        VideoPlayerController.file(File(widget.videoPaths[_currentIndex]))
-          ..initialize().then((_) {
-            setState(() {});
-            _controller.play();
-          });
-    if (_controller != null) {
-      _controller.dispose();
-    }
-    _controller.addListener(_videoListener);
-    _chewieController = ChewieController(
-        videoPlayerController: _controller,
-        aspectRatio: 16 / 9,
-        autoPlay: true,
-        looping: false,
-        allowFullScreen: true);
+  void _initializeVideoPlayer(String videoPath) {
+    _controller = VideoPlayerController.file(File(videoPath))
+      ..initialize().then((_) {
+        // Auto play the video
+        _controller.play();
+        // Enable looping for continuous playback
+        _controller.setLooping(false);
+        // Listen for video playback completion
+        _controller.addListener(() {
+          if (_controller.value.position >= _controller.value.duration) {
+            // Move to the next video in the playlist
+            print("Habis");
+            _playNextVideo();
+          }
+        });
+        // Update the state to rebuild UI with initialized controller
+      });
   }
 
-  void _videoListener() {
-    if (_controller.value.position >= _controller.value.duration) {
-      _playNextVideo();
-    }
+  void _playNextVideo() {
+    setState(() {
+      _currentIndex = (_currentIndex + 1) % widget.videoPaths.length;
+      _controller.dispose(); // Dispose the current controller
+      _initializeVideoPlayer(widget.videoPaths[_currentIndex]);
+    });
   }
+
+  @override
+  void dispose() {
+    _controller.dispose(); // Dispose the controller when the widget is disposed
+    super.dispose();
+  }
+
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   _currentIndex = widget.initialIndex;
+  //   _initializePlayer();
+  //   startTimer();
+  // }
 
   // Future<void> _initializePlayer() async {
+  //   if (_chewieController != null) {
+  //     _chewieController!.dispose();
+  //   }
+
   //   _controller =
   //       VideoPlayerController.file(File(widget.videoPaths[_currentIndex]))
   //         ..initialize().then((_) {
   //           setState(() {});
   //           _controller.play();
   //         });
+  //   if (_controller != null) {
+  //     _controller.dispose();
+  //   }
+  //   _controller.addListener(_videoListener);
   //   _chewieController = ChewieController(
-  //     videoPlayerController: _controller,
-  //     aspectRatio: _controller.value.aspectRatio,
-  //     autoPlay: true,
-  //     looping: true,
-  //   );
+  //       videoPlayerController: _controller,
+  //       aspectRatio: 16 / 9,
+  //       autoPlay: true,
+  //       looping: false,
+  //       allowFullScreen: true);
   // }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    _chewieController?.dispose();
-    super.dispose();
-  }
+  // void _videoListener() {
+  //   if (_controller.value.position >= _controller.value.duration) {
+  //     _playNextVideo();
+  //   }
+  // }
 
-  void _playNextVideo() {
-    _currentIndex = (_currentIndex + 1) % widget.videoPaths.length;
-    _initializePlayer();
-  }
+  // // Future<void> _initializePlayer() async {
+  // //   _controller =
+  // //       VideoPlayerController.file(File(widget.videoPaths[_currentIndex]))
+  // //         ..initialize().then((_) {
+  // //           setState(() {});
+  // //           _controller.play();
+  // //         });
+  // //   _chewieController = ChewieController(
+  // //     videoPlayerController: _controller,
+  // //     aspectRatio: _controller.value.aspectRatio,
+  // //     autoPlay: true,
+  // //     looping: true,
+  // //   );
+  // // }
+
+  // @override
+  // void dispose() {
+  //   _controller.dispose();
+  //   _chewieController?.dispose();
+  //   super.dispose();
+  // }
+
+  // void _playNextVideo() {
+  //   _currentIndex = (_currentIndex + 1) % widget.videoPaths.length;
+  //   _initializePlayer();
+  // }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Center(
-          child: AspectRatio(
-        aspectRatio: 16 / 9,
-        child: Chewie(
-          controller: _chewieController!,
-        ),
-      )),
+        child: _controller.value.isInitialized
+            ? AspectRatio(
+                aspectRatio: _controller.value.aspectRatio,
+                child: VideoPlayer(_controller),
+              )
+            : CircularProgressIndicator(),
+      ),
+      // Center(
+      //     child: AspectRatio(
+      //   aspectRatio: 16 / 9,
+      //   child: Chewie(
+      //     controller: _chewieController!,
+      //   ),
+      // )),
     );
   }
 }
