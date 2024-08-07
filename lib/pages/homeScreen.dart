@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -42,6 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => FullscreenVideoPlayer(
+          videoUrls: videoUrls,
           videoPaths: filePaths,
           initialIndex: 0,
         ),
@@ -49,15 +51,15 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _downloadAndPlayVideos(BuildContext context) async {
-    final filePaths = await downloadVideos(videoUrls);
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => VideoListScreen(videoPaths: filePaths),
-      ),
-    );
-  }
+  // Future<void> _downloadAndPlayVideos(BuildContext context) async {
+  //   final filePaths = await downloadVideos(videoUrls);
+  //   Navigator.push(
+  //     context,
+  //     MaterialPageRoute(
+  //       builder: (context) => VideoListScreen(videoPaths: filePaths),
+  //     ),
+  //   );
+  // }
 
   var downloadedVideos = 0;
 
@@ -126,44 +128,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class VideoListScreen extends StatelessWidget {
-  final List<String> videoPaths;
-
-  VideoListScreen({required this.videoPaths});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Downloaded Videos')),
-      body: ListView.builder(
-        itemCount: videoPaths.length,
-        itemBuilder: (context, index) {
-          return ListTile(
-            title: Text('Video ${index + 1}'),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => FullscreenVideoPlayer(
-                    videoPaths: videoPaths,
-                    initialIndex: index,
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      ),
-    );
-  }
-}
-
 class FullscreenVideoPlayer extends StatefulWidget {
   final List<String> videoPaths;
+  final List<String> videoUrls;
   final int initialIndex;
 
   FullscreenVideoPlayer({
     required this.videoPaths,
+    required this.videoUrls,
     required this.initialIndex,
   });
 
@@ -176,11 +148,53 @@ class _FullscreenVideoPlayerState extends State<FullscreenVideoPlayer> {
   ChewieController? _chewieController;
   late int _currentIndex;
 
+  void cek() async {
+    print("jalan");
+    String url = "http://adsvideo.citraweb.co.id/api/iklan/";
+    Map body = {
+      "key": "c6cb45f6ac898a49cae6db1a48b254c9",
+      "auth_office": "eb163727917cbba1eea208541a643e74",
+      "auth_device": "86c034bb216ef4476a1a02a36bc0423d",
+      "sn": "10000316031575",
+      "mac": "B4E265C572C9"
+    };
+
+    try {
+      var responseAPI = await http.post(Uri.parse(url), body: jsonEncode(body));
+      print(body);
+      Map<String, dynamic> hasil = jsonDecode(responseAPI.body);
+      print(hasil);
+      List<String> videoUrls = [];
+      if (hasil['data'] != null) {
+        print("data dapat");
+        videoUrls.clear();
+        for (var i = 0; i < hasil['data'].length; i++) {
+          videoUrls.add(hasil['data'][i]['iklan_video_file_url']);
+        }
+        print(videoUrls);
+      }
+      // Assuming widget.videoUrls is defined somewhere in your widget
+      if (videoUrls != widget.videoUrls) {
+        _controller.dispose();
+        _chewieController?.dispose();
+      }
+    } catch (e) {
+      print("Error fetching data: $e");
+    }
+  }
+
+// Now, create a function to start the timer
+  void startTimer() {
+    const duration = Duration(seconds: 5); // 5 seconds interval
+    Timer.periodic(duration, (Timer t) => cek());
+  }
+
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
     _initializePlayer();
+    startTimer();
   }
 
   Future<void> _initializePlayer() async {
