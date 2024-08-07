@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:chewie/chewie.dart';
 import 'package:video_player/video_player.dart';
+import 'package:collection/collection.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -140,13 +141,16 @@ class FullscreenVideoPlayer extends StatefulWidget {
   });
 
   @override
-  _FullscreenVideoPlayerState createState() => _FullscreenVideoPlayerState();
+  _FullscreenVideoPlayerState createState() =>
+      _FullscreenVideoPlayerState(videoUrls2: videoUrls);
 }
 
 class _FullscreenVideoPlayerState extends State<FullscreenVideoPlayer> {
+  _FullscreenVideoPlayerState({required this.videoUrls2});
   late VideoPlayerController _controller;
   ChewieController? _chewieController;
   late int _currentIndex;
+  final List<String> videoUrls2;
 
   void cek() async {
     print("jalan");
@@ -165,19 +169,32 @@ class _FullscreenVideoPlayerState extends State<FullscreenVideoPlayer> {
       Map<String, dynamic> hasil = jsonDecode(responseAPI.body);
       print(hasil);
       List<String> videoUrls = [];
+      List<String> videoUrlsx = [];
+
       if (hasil['data'] != null) {
         print("data dapat");
         videoUrls.clear();
         for (var i = 0; i < hasil['data'].length; i++) {
-          videoUrls.add(hasil['data'][i]['iklan_video_file_url']);
+          videoUrlsx.add(hasil['data'][i]['iklan_video_file_url']);
         }
-        print(videoUrls);
+        setState(() {
+          videoUrls = videoUrlsx;
+        });
+        if (!ListEquality().equals(videoUrls, videoUrls2)) {
+          print('tidak sama');
+          print(videoUrls);
+          print(videoUrls2);
+          _controller.dispose();
+          _chewieController?.dispose();
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => HomeScreen()),
+          );
+        }
+        // print(videoUrls);
       }
+
       // Assuming widget.videoUrls is defined somewhere in your widget
-      if (videoUrls != widget.videoUrls) {
-        _controller.dispose();
-        _chewieController?.dispose();
-      }
     } catch (e) {
       print("Error fetching data: $e");
     }
